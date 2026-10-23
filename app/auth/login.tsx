@@ -116,9 +116,9 @@ export default function Login() {
                 showsVerticalScrollIndicator={false}
             >
                 <BackHeader
-                    title="Criar conta"
+                    title="Entrar"
                     effectPhrase={''}
-                    subtitle="Preencha seus dados para começar"
+                    subtitle="Acesse sua conta para continuar"
                     showLogo={true}
                 />
 

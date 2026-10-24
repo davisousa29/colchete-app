@@ -67,17 +67,25 @@ export default function Planos() {
     const pixRef = useRef<PixData | null>(null)
     const consultandoRef = useRef(false)
 
+    const etapaRef = useRef<Etapa>(etapa)
+    etapaRef.current = etapa
+
     useFocusEffect(
         useCallback(() => {
-            if (etapa === 'carregando') carregarPlanos()
-        }, [etapa])
+            if (etapaRef.current === 'carregando' || etapaRef.current === 'escolha') {
+                carregarPlanos()
+            }
+        }, [])
     )
 
     async function carregarPlanos() {
         try {
             const lista = await getPlans()
             setPlanos(lista)
-            setSelecionado(lista[0]?.plan ?? null)
+            // Mantém a escolha da pessoa se o plano ainda existir
+            setSelecionado((atual) =>
+                lista.some((p) => p.plan === atual) ? atual : lista[0]?.plan ?? null
+            )
             setEtapa('escolha')
         } catch (error) {
             setErro(mensagemDeErro(error, 'Não foi possível carregar os planos.'))
@@ -125,6 +133,7 @@ export default function Planos() {
                     setPayment(null)
                     pixRef.current = null
                     setEtapa('escolha')
+                    carregarPlanos()
                     return
                 }
 
@@ -165,6 +174,7 @@ export default function Planos() {
         // No QR, "voltar" retorna à escolha (a cobrança pendente é reaproveitada se gerar de novo)
         if (etapa === 'pix') {
             setEtapa('escolha')
+            carregarPlanos()
             return
         }
         if (router.canGoBack()) router.back()

@@ -185,7 +185,7 @@ export default function NotificacoesScreen() {
                 ListFooterComponent={
                     loading && pagina > 1 ? (
                         <ActivityIndicator color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
-                    ) : null
+                    ) : undefined
                 }
             />
         </View>

@@ -274,12 +274,12 @@ export default function BuscaScreen() {
                             <Text style={styles.vazioTexto}>Busque fazendeiros</Text>
                             <Text style={styles.vazioSubtexto}>Use o campo acima para encontrar fazendeiros disponíveis</Text>
                         </View>
-                    ) : null
+                    ) : undefined
                 }
                 ListFooterComponent={
                     loading && pagina > 1 ? (
                         <ActivityIndicator color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
-                    ) : null
+                    ) : undefined
                 }
             />
         </View>

@@ -1,6 +1,9 @@
 {
   "name": "app-consultoragro",
   "version": "1.0.0",
+  "engines": {
+    "node": "^22.13.0 || ^24.3.0 || >=26.0.0"
+  },
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

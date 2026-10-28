@@ -5,21 +5,44 @@ import { AuthResponse, User } from '@/src/types'
 // A sessão (token, usuário) é gravada só pelo authStore.
 // Este arquivo apenas conversa com a API.
 
-// ── Registro ──────────────────────────────────────────────────────────────────
+// ── Cadastro (2 passos: formulário → código por e-mail) ───────────────────────
+export interface CadastroIniciado {
+    message: string
+    email: string
+    segundos_para_reenvio: number
+}
+
+// Passo 1: valida o formulário e envia o código. A conta ainda NÃO existe.
 export async function register(data: {
     name: string
     email: string
     cpf: string
+    data_nascimento: string // AAAA-MM-DD
     phone: string
     username: string
     whatsapp: string
     password: string
     password_confirmation: string
-}): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/register', {
-        ...data,
-        role: 'consultor',
-    })
+    aceite_termos: boolean
+    termos: string[] // ids das versões vigentes lidas
+}): Promise<CadastroIniciado> {
+    const response = await api.post<CadastroIniciado>('/auth/register', data)
+    return response.data
+}
+
+// Passo 2: confere o código e cria a conta (já devolve a sessão)
+export async function confirmarCadastro(email: string, codigo: string): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/auth/register/confirmar', { email, codigo })
+    return response.data
+}
+
+export async function reenviarCodigoCadastro(
+    email: string
+): Promise<{ message: string; segundos_para_reenvio: number }> {
+    const response = await api.post<{ message: string; segundos_para_reenvio: number }>(
+        '/auth/register/reenviar',
+        { email }
+    )
     return response.data
 }
 

@@ -3,6 +3,9 @@ export interface User {
     id: string
     name: string
     email: string
+    cpf?: string | null
+    data_nascimento?: string | null
+    email_verified_at?: string | null
     phone: string | null
     username: string
     whatsapp: string | null

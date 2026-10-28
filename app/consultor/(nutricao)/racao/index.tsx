@@ -16,8 +16,10 @@ import { globalStyles } from '@/src/constants/globalStyles'
 import BackButton from '@/src/components/Header/BackButton'
 import FilterChips, { FilterChip } from '@/src/components/Filter/FilterChips'
 import CentralModal from '@/src/components/Modal/CentralModal'
+import PesoInput from '@/src/components/Input/PesoInput'
 import api from '@/src/services/api'
 import { sanitizarNumero, parsearNumero, isNumeroValido } from '@/src/utils/numbers'
+import { pesoParaNumero } from '@/src/utils/masks'
 
 interface Especie { id: string; nome: string }
 interface Raca { id: string; nome: string; grupo: string }
@@ -100,9 +102,9 @@ export default function RacaoStep1() {
         if (!racaSelecionada) return 'Selecione uma raça.'
         if (!categoriaSelecionada) return 'Selecione uma categoria.'
         if (!sistemaSelecionado) return 'Selecione o sistema de produção.'
-        if (!isNumeroValido(pesoInicial)) return 'Informe o peso inicial.'
-        if (!isNumeroValido(pesoFinal)) return 'Informe o peso final.'
-        if (parsearNumero(pesoInicial) >= parsearNumero(pesoFinal)) return 'O peso final deve ser maior que o peso inicial.'
+        if (pesoParaNumero(pesoInicial) <= 0) return 'Informe o peso inicial.'
+        if (pesoParaNumero(pesoFinal) <= 0) return 'Informe o peso final.'
+        if (pesoParaNumero(pesoInicial) >= pesoParaNumero(pesoFinal)) return 'O peso final deve ser maior que o peso inicial.'
         if (!isNumeroValido(gmd)) return 'Informe o ganho médio diário.'
         if (parsearNumero(gmd) <= 0 || parsearNumero(gmd) > 3) return 'O GMD deve ser entre 0.1 e 3 kg/dia.'
         if (tipoAplicacao === 'lote' && (!quantidade || Number(quantidade) < 1)) return 'Informe a quantidade de animais.'
@@ -123,8 +125,8 @@ export default function RacaoStep1() {
                 raca_id: racaSelecionada,
                 categoria_id: categoriaSelecionada,
                 sistema_id: sistemaSelecionado,
-                peso_inicial: String(parsearNumero(pesoInicial)),
-                peso_final: String(parsearNumero(pesoFinal)),
+                peso_inicial: String(pesoParaNumero(pesoInicial)),
+                peso_final: String(pesoParaNumero(pesoFinal)),
                 gmd: String(parsearNumero(gmd)),
                 quantidade,
                 tipo_aplicacao: tipoAplicacao,
@@ -225,28 +227,20 @@ export default function RacaoStep1() {
                         )}
 
                         <View style={styles.duasColunas}>
-                            <View style={[globalStyles.inputGroup, { flex: 1 }]}>
-                                <Text style={globalStyles.inputLabel}>Peso inicial (kg) *</Text>
-                                <TextInput
-                                    style={[globalStyles.input, { width: '100%' }]}
-                                    placeholder="Ex: 300"
-                                    placeholderTextColor={Colors.gray[400]}
-                                    value={pesoInicial}
-                                    onChangeText={text => setPesoInicial(sanitizarNumero(text))}
-                                    keyboardType="decimal-pad"
-                                />
-                            </View>
-                            <View style={[globalStyles.inputGroup, { flex: 1 }]}>
-                                <Text style={globalStyles.inputLabel}>Peso final (kg) *</Text>
-                                <TextInput
-                                    style={[globalStyles.input, { width: '100%' }]}
-                                    placeholder="Ex: 400"
-                                    placeholderTextColor={Colors.gray[400]}
-                                    value={pesoFinal}
-                                    onChangeText={text => setPesoFinal(sanitizarNumero(text))}
-                                    keyboardType="decimal-pad"
-                                />
-                            </View>
+                            <PesoInput
+                                label="Peso inicial *"
+                                value={pesoInicial}
+                                onChange={setPesoInicial}
+                                placeholder="Ex: 300"
+                                style={{ flex: 1 }}
+                            />
+                            <PesoInput
+                                label="Peso final *"
+                                value={pesoFinal}
+                                onChange={setPesoFinal}
+                                placeholder="Ex: 400"
+                                style={{ flex: 1 }}
+                            />
                         </View>
 
                         <View style={globalStyles.inputGroup}>

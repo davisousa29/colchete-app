@@ -1,6 +1,7 @@
 import { View, StyleSheet } from 'react-native'
 import { Stack } from 'expo-router'
 import AppHeader from '@/src/components/Header/AppHeader'
+import TermosPendentesGate from '@/src/components/Termos/TermosPendentesGate'
 import { Colors } from '@/src/constants'
 
 // Header fixo em cima; as telas ocupam apenas o espaço que sobra abaixo dele
@@ -16,6 +17,9 @@ export default function AppLayout() {
                     }}
                 />
             </View>
+
+            {/* Aceite obrigatório de termos atualizados — fica por cima de qualquer tela */}
+            <TermosPendentesGate />
         </View>
     )
 }

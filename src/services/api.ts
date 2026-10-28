@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import Constants from 'expo-constants'
 import { useAuthStore } from '@/src/store/authStore'
+import { useTermosStore } from '@/src/store/termosStore'
 
 /**
  * Endereço da API, nesta ordem:
@@ -106,6 +107,12 @@ api.interceptors.response.use(
         // Assinatura expirada — redireciona para a tela de bloqueio
         if (status === 402 && error.response?.data?.subscription === 'inactive') {
             router.replace('/assinatura/expirada')
+            return Promise.reject(error)
+        }
+
+        // Termos atualizados ainda não aceitos — o TermosPendentesGate abre o modal de aceite
+        if (status === 403 && error.response?.data?.code === 'termos_pendentes') {
+            useTermosStore.getState().marcarPendente()
             return Promise.reject(error)
         }
 

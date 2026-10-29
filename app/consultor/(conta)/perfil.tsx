@@ -6,38 +6,84 @@ import {
     TouchableOpacity,
     TextInput,
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
+import { ChevronRight, FileText, Trash2 } from 'lucide-react-native'
 import { useAuthStore } from '@/src/store/authStore'
 import { globalStyles } from '@/src/constants/globalStyles'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
 import api from '@/src/services/api'
+import { getTermosVigentes, Termo, TipoTermo } from '@/src/services/termoService'
 import CentralModal from '@/src/components/Modal/CentralModal'
-import BackHeader from "@/src/components/Header/BackHeader";
+import BackHeader from '@/src/components/Header/BackHeader'
+import MaskedInput from '@/src/components/Input/MaskedInput'
+import TermoModal from '@/src/components/Termos/TermoModal'
+import ExcluirContaModal from '@/src/components/Conta/ExcluirContaModal'
 import { ESPECIALIZACOES, ESTADOS } from '@/src/constants/options'
+import { dataMask, phoneMask } from '@/src/utils/masks'
+import {
+    calcularIdade,
+    digitosParaDataIso,
+    formatarDataBr,
+    IDADE_MINIMA_CADASTRO,
+} from '@/src/utils/datas'
+
+type ModalState = {
+    visible: boolean
+    title: string
+    message: string
+    type: 'default' | 'success' | 'error'
+}
+
+function formatarCpf(cpf?: string | null): string {
+    if (!cpf) return '—'
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+}
+
+// Linha somente leitura (dados de identificação que não mudam pelo app)
+function CampoLeitura({ label, valor, dica }: { label: string; valor: string; dica?: string }) {
+    return (
+        <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.inputLabel}>{label}</Text>
+            <View style={styles.campoLeitura}>
+                <Text style={styles.campoLeituraTexto}>{valor}</Text>
+            </View>
+            {dica && <Text style={globalStyles.inputHint}>{dica}</Text>}
+        </View>
+    )
+}
 
 export default function Perfil() {
-    const { user, setProfile } = useAuthStore()
+    // boasVindas=1 → aberto logo após o cadastro ("Quase lá!")
+    const { boasVindas } = useLocalSearchParams<{ boasVindas?: string }>()
+    const modoBoasVindas = boasVindas === '1'
 
+    const { user, setUser, setProfile } = useAuthStore()
+
+    // ── Dados pessoais ────────────────────────────────────────────────────────
+    const [nome, setNome] = useState(user?.name ?? '')
+    const [telefone, setTelefone] = useState(user?.phone ?? '')
+    const [whatsapp, setWhatsapp] = useState(user?.whatsapp ?? '')
+    const [dataNascimento, setDataNascimento] = useState('') // dígitos; só usado se ainda estiver vazia
+
+    // ── Perfil profissional ───────────────────────────────────────────────────
     const [crea, setCrea] = useState('')
     const [especializacao, setEspecializacao] = useState('')
     const [especializacaoCustom, setEspecializacaoCustom] = useState('')
     const [bio, setBio] = useState('')
     const [estado, setEstado] = useState('')
     const [cidade, setCidade] = useState('')
+
     const [loading, setLoading] = useState(false)
     const [loadingPerfil, setLoadingPerfil] = useState(true)
-
-    const [isSuccess, setIsSuccess] = useState(false)
-    const [modal, setModal] = useState({
+    const [modal, setModal] = useState<ModalState>({
         visible: false,
         title: '',
         message: '',
-        type: 'default' as 'default' | 'success' | 'error',
+        type: 'default',
     })
 
     const [cidades, setCidades] = useState<string[]>([])
@@ -45,12 +91,28 @@ export default function Perfil() {
     const [loadingCidades, setLoadingCidades] = useState(false)
     const [cidadeValida, setCidadeValida] = useState(false)
 
-    // ── Carrega o perfil existente ─────────────────────────────────────────────
+    // ── Documentos e exclusão ─────────────────────────────────────────────────
+    const [termoAberto, setTermoAberto] = useState<Termo | null>(null)
+    const [carregandoTermo, setCarregandoTermo] = useState<TipoTermo | null>(null)
+    const [excluirVisivel, setExcluirVisivel] = useState(false)
+
+    function avisar(message: string, title = 'Atenção', type: ModalState['type'] = 'default') {
+        setModal({ visible: true, title, message, type })
+    }
+
+    // ── Carrega usuário e perfil ──────────────────────────────────────────────
     useEffect(() => {
         async function fetchPerfil() {
             try {
                 const response = await api.get('/perfil')
+                const usuario = response.data.user
                 const perfil = response.data.perfil
+
+                if (usuario) {
+                    setNome(usuario.name ?? '')
+                    setTelefone(usuario.phone ?? '')
+                    setWhatsapp(usuario.whatsapp ?? '')
+                }
 
                 if (perfil) {
                     setCrea(perfil.crea_number ?? '')
@@ -68,18 +130,7 @@ export default function Perfil() {
                     }
                 }
             } catch (error: any) {
-                const errors = error.response?.data?.errors
-
-                if (errors) {
-                    const firstError = Object.values(errors)[0] as string[]
-
-                    setModal({
-                        visible: true,
-                        title: 'Erro',
-                        message: firstError[0],
-                        type: 'error',
-                    })
-                }
+                avisar(error.response?.data?.message || 'Não foi possível carregar o perfil.', 'Erro', 'error')
             } finally {
                 setLoadingPerfil(false)
             }
@@ -88,7 +139,7 @@ export default function Perfil() {
         fetchPerfil()
     }, [])
 
-    // ── Busca cidades pelo estado selecionado ──────────────────────────────────
+    // ── Busca cidades pelo estado selecionado ─────────────────────────────────
     useEffect(() => {
         if (!estado) return
 
@@ -113,13 +164,7 @@ export default function Perfil() {
                     setCidadeValida(false)
                 }
             } catch {
-                setModal({
-                    visible: true,
-                    title: 'Aviso',
-                    message: 'Não foi possível carregar as cidades.',
-                    type: 'error',
-                })
-                Alert.alert('Aviso', 'Não foi possível carregar as cidades.')
+                avisar('Não foi possível carregar as cidades.', 'Aviso', 'error')
             } finally {
                 setLoadingCidades(false)
             }
@@ -128,7 +173,7 @@ export default function Perfil() {
         fetchCidades()
     }, [estado])
 
-    // ── Filtra sugestões de cidade conforme digitação ──────────────────────────
+    // ── Filtra sugestões de cidade conforme digitação ─────────────────────────
     useEffect(() => {
         if (!cidade || cidadeValida) {
             setCidadesFiltradas([])
@@ -141,87 +186,107 @@ export default function Perfil() {
         setCidadesFiltradas(filtradas.slice(0, 10))
     }, [cidade, cidades])
 
-    // ── Salva o perfil ─────────────────────────────────────────────────────────
+    // ── Abre Termos de Uso ou Política de Privacidade ─────────────────────────
+    async function abrirTermo(tipo: TipoTermo) {
+        setCarregandoTermo(tipo)
+        try {
+            const termos = await getTermosVigentes()
+            const termo = termos.find(t => t.tipo === tipo)
+            if (termo) setTermoAberto(termo)
+        } catch {
+            avisar('Não foi possível carregar o documento.', 'Erro', 'error')
+        } finally {
+            setCarregandoTermo(null)
+        }
+    }
+
+    // ── Salva ─────────────────────────────────────────────────────────────────
     async function handleSalvar() {
+        if (nome.trim().length < 3) {
+            avisar('Informe seu nome completo.')
+            return
+        }
+
+        if (telefone && telefone.length !== 11) {
+            avisar('O telefone deve ter DDD + 9 dígitos.')
+            return
+        }
+
+        if (whatsapp && whatsapp.length !== 11) {
+            avisar('O WhatsApp deve ter DDD + 9 dígitos.')
+            return
+        }
+
+        let dataIso: string | null = null
+        if (!user?.data_nascimento && dataNascimento) {
+            dataIso = digitosParaDataIso(dataNascimento)
+            if (!dataIso) {
+                avisar('Informe uma data de nascimento válida (DD/MM/AAAA).')
+                return
+            }
+            if (calcularIdade(dataIso) < IDADE_MINIMA_CADASTRO) {
+                avisar(`É preciso ter pelo menos ${IDADE_MINIMA_CADASTRO} anos.`)
+                return
+            }
+        }
+
+        if (!especializacao) {
+            avisar('Selecione uma especialização.')
+            return
+        }
+
         if (especializacao === 'Outro' && !especializacaoCustom.trim()) {
-            setModal({
-                visible: true,
-                title: 'Atenção',
-                message: 'Digite sua especialização.',
-                type: 'default',
-            })
+            avisar('Digite sua especialização.')
             return
         }
 
         if (!cidadeValida) {
-            setModal({
-                visible: true,
-                title: 'Atenção',
-                message: 'Selecione uma cidade válida da lista.',
-                type: 'default',
-            })
+            avisar('Selecione uma cidade válida da lista.')
             return
         }
 
         setLoading(true)
-
         try {
-            await api.post('/perfil', {
-                crea_number: crea,
-                specialization:
-                    especializacao === 'Outro'
-                        ? especializacaoCustom
-                        : especializacao,
-                bio,
-                location_state: estado,
-                location_city: cidade,
-            })
-
             const response = await api.post('/perfil', {
+                name: nome.trim(),
+                phone: telefone || null,
+                whatsapp: whatsapp || null,
+                ...(dataIso ? { data_nascimento: dataIso } : {}),
                 crea_number: crea,
-                specialization:
-                    especializacao === 'Outro'
-                        ? especializacaoCustom
-                        : especializacao,
+                specialization: especializacao === 'Outro' ? especializacaoCustom.trim() : especializacao,
                 bio,
                 location_state: estado,
                 location_city: cidade,
             })
 
-            setProfile(response.data.perfil)
+            // Atualiza a sessão com o usuário e o perfil salvos
+            const token = useAuthStore.getState().token
+            if (token) await setUser(response.data.user, token)
+            await setProfile(response.data.perfil)
+            setDataNascimento('')
 
-            setIsSuccess(true)
-
-            setModal({
-                visible: true,
-                title: 'Sucesso',
-                message: 'Perfil salvo com sucesso!',
-                type: 'success',
-            })
+            avisar('Perfil salvo com sucesso!', 'Sucesso', 'success')
         } catch (error: any) {
             const errors = error.response?.data?.errors
 
             if (errors) {
                 const firstError = Object.values(errors)[0] as string[]
-
-                setModal({
-                    visible: true,
-                    title: 'Erro',
-                    message: firstError[0],
-                    type: 'error',
-                })
+                avisar(firstError[0], 'Erro', 'error')
             } else {
-                setModal({
-                    visible: true,
-                    title: 'Erro',
-                    message:
-                        error.response?.data?.message ||
-                        'Erro ao salvar perfil.',
-                    type: 'error',
-                })
+                avisar(error.response?.data?.message || 'Erro ao salvar perfil.', 'Erro', 'error')
             }
         } finally {
             setLoading(false)
+        }
+    }
+
+    function handleFecharModal() {
+        const sucesso = modal.type === 'success'
+        setModal(prev => ({ ...prev, visible: false }))
+
+        // Depois do cadastro, salvar leva ao início
+        if (sucesso && modoBoasVindas) {
+            router.replace('/consultor/home')
         }
     }
 
@@ -233,6 +298,8 @@ export default function Perfil() {
         )
     }
 
+    const dataNascimentoSalva = user?.data_nascimento
+
     return (
         <KeyboardAvoidingView
             style={globalStyles.screen}
@@ -243,23 +310,89 @@ export default function Perfil() {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-
-                <BackHeader
-                    title={
-                        <Text style={styles.step}>Quase lá!</Text>
-                    }
-                    effectPhrase={
-                        <Text style={styles.title}>Complete seu perfil</Text>
-                    }
-                    subtitle={
-                        <Text style={styles.subtitle}>
-                            Essas informações ajudam os fazendeiros a te encontrarem
-                        </Text>
-                    }
-                    showLogo={false}
-                />
+                {modoBoasVindas ? (
+                    <BackHeader
+                        title={<Text style={styles.step}>Quase lá!</Text>}
+                        effectPhrase={<Text style={styles.title}>Complete seu perfil</Text>}
+                        subtitle={
+                            <Text style={styles.subtitle}>
+                                Essas informações ajudam os fazendeiros a te encontrarem
+                            </Text>
+                        }
+                        showLogo={false}
+                    />
+                ) : (
+                    <BackHeader
+                        title="Meu perfil"
+                        effectPhrase={''}
+                        subtitle="Seus dados de cadastro e perfil profissional"
+                        showLogo={false}
+                    />
+                )}
 
                 <View style={styles.form}>
+
+                    {/* ── Dados da conta ─────────────────────────────────── */}
+                    <Text style={styles.secao}>Dados da conta</Text>
+
+                    <View style={globalStyles.inputGroup}>
+                        <Text style={globalStyles.inputLabel}>Nome completo *</Text>
+                        <TextInput
+                            style={globalStyles.input}
+                            placeholder="Seu nome completo"
+                            placeholderTextColor={Colors.gray[400]}
+                            value={nome}
+                            onChangeText={setNome}
+                            autoCapitalize="words"
+                        />
+                    </View>
+
+                    <CampoLeitura label="Email" valor={user?.email ?? '—'} />
+                    <CampoLeitura label="CPF" valor={formatarCpf(user?.cpf)} />
+                    <CampoLeitura label="Nome de usuário" valor={user?.username ? `@${user.username}` : '—'} />
+
+                    {dataNascimentoSalva ? (
+                        <CampoLeitura label="Data de nascimento" valor={formatarDataBr(dataNascimentoSalva)} />
+                    ) : (
+                        <MaskedInput
+                            label="Data de nascimento"
+                            value={dataNascimento}
+                            onChange={setDataNascimento}
+                            placeholder="DD/MM/AAAA"
+                            keyboardType="number-pad"
+                            mask={dataMask}
+                            hint="Pode ser informada uma única vez"
+                        />
+                    )}
+
+                    <Text style={styles.dicaLeitura}>
+                        Para alterar email, CPF, nome de usuário ou data de nascimento, fale com o suporte:
+                        colchete.gestaodefazendas@gmail.com
+                    </Text>
+
+                    {/* ── Contato ────────────────────────────────────────── */}
+                    <Text style={styles.secao}>Contato</Text>
+
+                    <MaskedInput
+                        label="Telefone"
+                        value={telefone}
+                        onChange={setTelefone}
+                        placeholder="(62) 99999-9999"
+                        keyboardType="phone-pad"
+                        mask={phoneMask}
+                    />
+
+                    <MaskedInput
+                        label="WhatsApp"
+                        value={whatsapp}
+                        onChange={setWhatsapp}
+                        placeholder="(62) 99999-9999"
+                        keyboardType="phone-pad"
+                        mask={phoneMask}
+                    />
+
+                    {/* ── Perfil profissional ────────────────────────────── */}
+                    <Text style={styles.secao}>Perfil profissional</Text>
 
                     <View style={globalStyles.inputGroup}>
                         <Text style={globalStyles.inputLabel}>Número do CREA</Text>
@@ -284,20 +417,14 @@ export default function Perfil() {
                             {ESPECIALIZACOES.map((item) => (
                                 <TouchableOpacity
                                     key={item}
-                                    style={[
-                                        styles.chip,
-                                        especializacao === item && styles.chipSelected,
-                                    ]}
+                                    style={[styles.chip, especializacao === item && styles.chipSelected]}
                                     onPress={() => {
                                         setEspecializacao(item)
                                         if (item !== 'Outro') setEspecializacaoCustom('')
                                     }}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={[
-                                        styles.chipText,
-                                        especializacao === item && styles.chipTextSelected,
-                                    ]}>
+                                    <Text style={[styles.chipText, especializacao === item && styles.chipTextSelected]}>
                                         {item}
                                     </Text>
                                 </TouchableOpacity>
@@ -329,6 +456,7 @@ export default function Perfil() {
                             multiline
                             numberOfLines={4}
                             textAlignVertical="top"
+                            maxLength={1000}
                         />
                         <Text style={globalStyles.inputHint}>Opcional</Text>
                     </View>
@@ -343,18 +471,11 @@ export default function Perfil() {
                             {ESTADOS.map((uf) => (
                                 <TouchableOpacity
                                     key={uf}
-                                    style={[
-                                        styles.chip,
-                                        styles.chipEstado,
-                                        estado === uf && styles.chipSelected,
-                                    ]}
+                                    style={[styles.chip, styles.chipEstado, estado === uf && styles.chipSelected]}
                                     onPress={() => setEstado(uf)}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={[
-                                        styles.chipText,
-                                        estado === uf && styles.chipTextSelected,
-                                    ]}>
+                                    <Text style={[styles.chipText, estado === uf && styles.chipTextSelected]}>
                                         {uf}
                                     </Text>
                                 </TouchableOpacity>
@@ -367,11 +488,7 @@ export default function Perfil() {
 
                         <View style={styles.cidadeContainer}>
                             <TextInput
-                                style={[
-                                    globalStyles.input,
-                                    { flex: 1 },
-                                    cidadeValida && styles.inputValido,
-                                ]}
+                                style={[globalStyles.input, { flex: 1 }, cidadeValida && styles.inputValido]}
                                 placeholder={
                                     !estado
                                         ? 'Selecione um estado primeiro'
@@ -397,11 +514,7 @@ export default function Perfil() {
                         </View>
 
                         {loadingCidades && (
-                            <ActivityIndicator
-                                size="small"
-                                color={Colors.primary}
-                                style={{ marginTop: 4 }}
-                            />
+                            <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 4 }} />
                         )}
 
                         {cidadesFiltradas.length > 0 && (
@@ -430,50 +543,87 @@ export default function Perfil() {
                     </View>
 
                     <TouchableOpacity
-                        style={[
-                            globalStyles.buttonPrimary,
-                            loading && globalStyles.buttonDisabled,
-                        ]}
+                        style={[globalStyles.buttonPrimary, loading && globalStyles.buttonDisabled]}
                         onPress={handleSalvar}
                         disabled={loading}
                     >
                         {loading ? (
                             <ActivityIndicator color={Colors.white} />
                         ) : (
-                            <Text style={globalStyles.buttonPrimaryText}>Salvar e continuar</Text>
+                            <Text style={globalStyles.buttonPrimaryText}>
+                                {modoBoasVindas ? 'Salvar e continuar' : 'Salvar alterações'}
+                            </Text>
                         )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.skipButton}
-                        onPress={() => router.replace('/consultor/home')}
-                    >
-                        <Text style={styles.skipText}>Preencher depois</Text>
-                    </TouchableOpacity>
+                    {modoBoasVindas ? (
+                        <TouchableOpacity
+                            style={styles.skipButton}
+                            onPress={() => router.replace('/consultor/home')}
+                        >
+                            <Text style={styles.skipText}>Preencher depois</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <>
+                            {/* ── Documentos ─────────────────────────────── */}
+                            <Text style={styles.secao}>Documentos</Text>
+
+                            {([
+                                ['uso', 'Termos de Uso'],
+                                ['privacidade', 'Política de Privacidade'],
+                            ] as [TipoTermo, string][]).map(([tipo, titulo]) => (
+                                <TouchableOpacity
+                                    key={tipo}
+                                    style={styles.linhaLink}
+                                    onPress={() => abrirTermo(tipo)}
+                                    disabled={carregandoTermo !== null}
+                                    activeOpacity={0.7}
+                                >
+                                    <FileText size={18} color={Colors.primary} />
+                                    <Text style={styles.linhaLinkTexto}>{titulo}</Text>
+                                    {carregandoTermo === tipo ? (
+                                        <ActivityIndicator size="small" color={Colors.primary} />
+                                    ) : (
+                                        <ChevronRight size={18} color={Colors.gray[400]} />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+
+                            {/* ── Excluir conta ──────────────────────────── */}
+                            <Text style={styles.secao}>Excluir conta</Text>
+                            <Text style={styles.dicaLeitura}>
+                                Apaga definitivamente sua conta e seus dados de trabalho.
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.botaoExcluir}
+                                onPress={() => setExcluirVisivel(true)}
+                                activeOpacity={0.7}
+                            >
+                                <Trash2 size={18} color={Colors.error} />
+                                <Text style={styles.botaoExcluirTexto}>Excluir minha conta</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
 
                 </View>
             </ScrollView>
+
+            <TermoModal termo={termoAberto} onClose={() => setTermoAberto(null)} />
+
+            <ExcluirContaModal visible={excluirVisivel} onClose={() => setExcluirVisivel(false)} />
 
             <CentralModal
                 visible={modal.visible}
                 title={modal.title}
                 message={modal.message}
                 type={modal.type}
-                onClose={() => {
-                    setModal(prev => ({ ...prev, visible: false }))
-                }}
+                onClose={handleFecharModal}
             />
         </KeyboardAvoidingView>
     )
 }
 
 const styles = StyleSheet.create({
-    scroll: {
-        paddingTop: 80,
-    },
-    header: {
-        marginBottom: Spacing.xl,
-    },
     step: {
         fontSize: FontSize.sm,
         fontWeight: 'bold',
@@ -492,10 +642,35 @@ const styles = StyleSheet.create({
         fontSize: FontSize.md,
         color: Colors.gray[600],
         lineHeight: 22,
-        textAlign: "center",
+        textAlign: 'center',
     },
     form: {
         gap: Spacing.lg,
+    },
+    secao: {
+        fontSize: FontSize.lg,
+        fontWeight: 'bold',
+        color: Colors.black,
+        marginTop: Spacing.sm,
+        paddingBottom: Spacing.xs,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray[200],
+    },
+    campoLeitura: {
+        backgroundColor: Colors.gray[100],
+        borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.sm + 2,
+    },
+    campoLeituraTexto: {
+        fontSize: FontSize.md,
+        color: Colors.gray[600],
+    },
+    dicaLeitura: {
+        fontSize: FontSize.xs,
+        color: Colors.gray[500],
+        lineHeight: 18,
+        marginTop: -Spacing.sm,
     },
     bioInput: {
         height: 100,
@@ -580,5 +755,38 @@ const styles = StyleSheet.create({
     skipText: {
         fontSize: FontSize.sm,
         color: Colors.gray[500],
+    },
+    linhaLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.md,
+        borderWidth: 1,
+        borderColor: Colors.gray[200],
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.md,
+        marginTop: -Spacing.sm,
+    },
+    linhaLinkTexto: {
+        flex: 1,
+        fontSize: FontSize.md,
+        color: Colors.black,
+    },
+    botaoExcluir: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.sm,
+        borderWidth: 1.5,
+        borderColor: Colors.error,
+        borderRadius: BorderRadius.md,
+        paddingVertical: Spacing.md,
+        marginBottom: Spacing.xl,
+    },
+    botaoExcluirTexto: {
+        color: Colors.error,
+        fontSize: FontSize.md,
+        fontWeight: 'bold',
     },
 })

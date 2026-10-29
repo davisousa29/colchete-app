@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronRight } from 'lucide-react-native'
+import { ChevronRight, KeyRound } from 'lucide-react-native'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
 import { globalStyles } from '@/src/constants/globalStyles'
 import { Icons } from '@/src/constants/icons'
@@ -32,6 +32,13 @@ export default function Configuracoes() {
         {
             titulo: 'Segurança',
             itens: [
+                {
+                    icone: KeyRound,
+                    titulo: 'Alterar senha',
+                    descricao: 'Troque a senha de acesso à sua conta',
+                    rota: '/consultor/seguranca/alterar-senha',
+                    cor: '#F59F00',
+                },
                 {
                     icone: Icons.shield,
                     titulo: 'Autenticação em duas etapas',

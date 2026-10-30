@@ -8,7 +8,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.colchete.consultor"
+      "bundleIdentifier": "com.colchete.consultor",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDevelopmentRegion": "pt-BR"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,7 +20,11 @@
         "backgroundColor": "#ffffff"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.colchete.consultor"
+      "package": "com.colchete.consultor",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -32,15 +40,29 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Colchete usa sua localização para mostrar a previsão do tempo e o clima da sua região."
+        }
+      ],
       "expo-web-browser",
       "expo-sharing",
       "expo-status-bar"
     ],
     "scheme": "colchete-consultor",
     "extra": {
-      "apiUrl": "http://localhost/api",
       "googleWebClientId": "SEU_WEB_CLIENT_ID.apps.googleusercontent.com",
-      "googleIosClientId": "SEU_IOS_CLIENT_ID.apps.googleusercontent.com"
-    }
+      "googleIosClientId": "SEU_IOS_CLIENT_ID.apps.googleusercontent.com",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "b1ec2769-1c5f-4375-ab6d-48e3f586af6b"
+      }
+    },
+    "owner": "colchete-solucoes-em-gestao-rural"
   }
 }

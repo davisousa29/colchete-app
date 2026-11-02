@@ -12,9 +12,8 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { Check } from 'lucide-react-native'
-import { register, loginComGoogle } from '@/src/services/authService'
+import { register } from '@/src/services/authService'
 import { getTermosVigentes, Termo, TipoTermo } from '@/src/services/termoService'
-import { useAuthStore } from '@/src/store/authStore'
 import { Colors, FontSize, Spacing, BorderRadius } from '@/src/constants'
 import { globalStyles } from '@/src/constants/globalStyles'
 import BackHeader from '@/src/components/Header/BackHeader'
@@ -23,13 +22,12 @@ import { phoneMask, cpfMask, dataMask } from '@/src/utils/masks'
 import CentralModal from '@/src/components/Modal/CentralModal'
 import PasswordInput from '@/src/components/Input/PasswordInput'
 import PasswordStrength from '@/src/components/Input/PasswordStrength'
-import GoogleButton from '@/src/components/Auth/GoogleButton'
 import TermoModal from '@/src/components/Termos/TermoModal'
-import { useGoogleAuth } from '@/src/hooks/useGoogleAuth'
 import { isValidCpf } from '@/src/utils/document'
 import { calcularIdade, digitosParaDataIso, IDADE_MINIMA_CADASTRO } from '@/src/utils/datas'
+import { GOOGLE_LOGIN_HABILITADO } from '@/src/constants/features'
+import GoogleLoginSection from '@/src/components/Auth/GoogleLoginSection'
 
-const GOOGLE_LOGIN_HABILITADO = false
 
 type ModalState = {
     visible: boolean
@@ -39,8 +37,6 @@ type ModalState = {
 }
 
 export default function Register() {
-    const { setUser } = useAuthStore()
-
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [cpf, setCpf] = useState('')
@@ -57,7 +53,6 @@ export default function Register() {
         message: '',
         type: 'default',
     })
-    const [loadingGoogle, setLoadingGoogle] = useState(false)
 
     // ── Termos ────────────────────────────────────────────────────────────────
     const [termos, setTermos] = useState<Termo[]>([])
@@ -90,24 +85,6 @@ export default function Register() {
     function avisar(message: string, title = 'Atenção', type: ModalState['type'] = 'default') {
         setModal({ visible: true, title, message, type })
     }
-
-    const { pronto, login: iniciarGoogle } = useGoogleAuth(async (accessToken) => {
-        setLoadingGoogle(true)
-        try {
-            const resposta = await loginComGoogle(accessToken)
-            setUser(resposta.user, resposta.token)
-
-            if (resposta.cadastro_completo) {
-                router.replace('/consultor/home')
-            } else {
-                router.replace('/auth/completar-cadastro')
-            }
-        } catch (error: any) {
-            avisar(error.response?.data?.message || 'Erro ao entrar com Google.', 'Erro', 'error')
-        } finally {
-            setLoadingGoogle(false)
-        }
-    })
 
     async function handleRegister() {
         if (!name || !email || !cpf || !dataNascimento || !username || !password || !passwordConfirmation) {
@@ -370,22 +347,12 @@ export default function Register() {
                         )}
                     </TouchableOpacity>
 
+                    {/* Só monta quando ligado: desligado, nada do Google roda */}
                     {GOOGLE_LOGIN_HABILITADO && (
-                        <>
-                            {/* Separador */}
-                            <View style={styles.separador}>
-                                <View style={styles.linha} />
-                                <Text style={styles.separadorTexto}>ou</Text>
-                                <View style={styles.linha} />
-                            </View>
-
-                            <GoogleButton
-                                onPress={iniciarGoogle}
-                                loading={loadingGoogle}
-                                texto="Cadastrar com Google"
-                                disabled={!pronto}
-                            />
-                        </>
+                        <GoogleLoginSection
+                            texto="Cadastrar com Google"
+                            onErro={msg => avisar(msg, 'Erro', 'error')}
+                        />
                     )}
 
                 </View>
@@ -489,20 +456,5 @@ const styles = StyleSheet.create({
         color: Colors.primary,
         fontSize: FontSize.sm,
         fontWeight: 'bold',
-    },
-    separador: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.sm,
-        marginVertical: Spacing.xs,
-    },
-    linha: {
-        flex: 1,
-        height: 1,
-        backgroundColor: Colors.gray[300],
-    },
-    separadorTexto: {
-        fontSize: FontSize.sm,
-        color: Colors.gray[500],
     },
 })

@@ -5,13 +5,19 @@ import Constants from 'expo-constants'
 
 WebBrowser.maybeCompleteAuthSession()
 
-const webClientId = Constants.expoConfig?.extra?.googleWebClientId as string
-const iosClientId = Constants.expoConfig?.extra?.googleIosClientId as string
+const extra = Constants.expoConfig?.extra ?? {}
 
+/**
+ * Login com Google. Use só dentro do GoogleLoginSection:
+ * a biblioteca exige o ID de cliente da plataforma atual e lança um erro
+ * (que fecha o app) se ele faltar — por isso o hook só pode rodar com o
+ * login com Google ligado e os três IDs configurados no app.json.
+ */
 export function useGoogleAuth(onToken: (accessToken: string) => void) {
     const [request, response, promptAsync] = Google.useAuthRequest({
-        webClientId,
-        iosClientId,
+        webClientId: extra.googleWebClientId as string,
+        iosClientId: extra.googleIosClientId as string,
+        androidClientId: extra.googleAndroidClientId as string,
     })
 
     useEffect(() => {

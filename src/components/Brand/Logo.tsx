@@ -1,15 +1,18 @@
 import { View, Image, StyleSheet } from 'react-native'
-import { Colors, BorderRadius } from '@/src/constants'
+import { Colors } from '@/src/constants'
 
 interface LogoProps {
     size?: number
 }
 
+// Logo da marca no app: opção B (símbolo branco sobre o verde principal), em
+// cartão arredondado com sombra. A imagem já tem o fundo verde e a margem.
+// (O site usa a opção A, branca; o ícone do app também é a opção A.)
 export default function Logo({ size = 100 }: LogoProps) {
     return (
         <View style={[styles.container, { width: size, height: size, borderRadius: size * 0.24 }]}>
             <Image
-                source={require('@/assets/logo_AgroSystem_Consultor.png')}
+                source={require('@/assets/logo.png')}
                 style={{ width: size, height: size, borderRadius: size * 0.24 }}
             />
         </View>

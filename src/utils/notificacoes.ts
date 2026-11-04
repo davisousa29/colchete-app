@@ -42,8 +42,9 @@ export function abrirDestino(notif: Notificacao): boolean {
         return true
     }
 
+    // Avisos de assinatura: a área de assinatura do app (com o caminho para o site)
     if (rota === 'assinatura') {
-        router.push('/assinatura/planos' as any)
+        router.push('/consultor/assinatura' as any)
         return true
     }
 

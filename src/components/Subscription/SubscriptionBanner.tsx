@@ -1,8 +1,10 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import { router } from 'expo-router'
 import { Clock, ChevronRight } from 'lucide-react-native'
-import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
+import { Spacing, FontSize, BorderRadius } from '@/src/constants'
+import { SITE_ENDERECO } from '@/src/constants/site'
+import { SITE_LINK_HABILITADO } from '@/src/constants/features'
 import { SubscriptionStatus } from '@/src/services/subscriptionService'
+import { abrirSite } from '@/src/utils/site'
 
 interface Props {
     subscription: SubscriptionStatus | null
@@ -21,32 +23,43 @@ export default function SubscriptionBanner({ subscription }: Props) {
 
     const dias = subscription.days_remaining
     let titulo: string
-    let subtitulo: string
 
     if (subscription.status === 'trial') {
         titulo = dias > 0 ? `Seu teste grátis termina em ${textoDias(dias)}` : 'Seu teste grátis termina hoje'
-        subtitulo = 'Assine um plano para continuar usando'
     } else if (subscription.status === 'active' && dias <= DIAS_AVISO_RENOVACAO) {
         titulo = dias > 0 ? `Sua assinatura vence em ${textoDias(dias)}` : 'Sua assinatura vence hoje'
-        subtitulo = 'Renove agora: os dias que faltam não são perdidos'
     } else {
         return null
     }
 
-    return (
-        <TouchableOpacity
-            style={styles.container}
-            onPress={() => router.push('/assinatura/planos' as any)}
-            activeOpacity={0.85}
-        >
+    const conteudo = (
+        <>
             <View style={styles.icone}>
                 <Clock size={20} color="#B7791F" />
             </View>
             <View style={styles.conteudo}>
                 <Text style={styles.titulo}>{titulo}</Text>
-                <Text style={styles.subtitulo}>{subtitulo}</Text>
+                <Text style={styles.subtitulo}>
+                    Para mais informações de sua conta acesse o sistema{' '}
+                    <Text style={styles.endereco}>{SITE_ENDERECO}</Text>
+                </Text>
             </View>
-            <ChevronRight size={18} color="#B7791F" />
+            {SITE_LINK_HABILITADO && <ChevronRight size={18} color="#B7791F" />}
+        </>
+    )
+
+    // Com o link desligado, o aviso só informa (não é tocável)
+    if (!SITE_LINK_HABILITADO) {
+        return <View style={styles.container}>{conteudo}</View>
+    }
+
+    return (
+        <TouchableOpacity
+            style={styles.container}
+            onPress={() => abrirSite('/assinatura')}
+            activeOpacity={0.85}
+        >
+            {conteudo}
         </TouchableOpacity>
     )
 }
@@ -83,5 +96,8 @@ const styles = StyleSheet.create({
     subtitulo: {
         fontSize: FontSize.xs,
         color: '#A67C1A',
+    },
+    endereco: {
+        fontWeight: 'bold',
     },
 })

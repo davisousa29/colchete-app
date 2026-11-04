@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronRight, KeyRound } from 'lucide-react-native'
+import { ChevronRight, KeyRound, HandCoins } from 'lucide-react-native'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
 import { globalStyles } from '@/src/constants/globalStyles'
 import { Icons } from '@/src/constants/icons'
@@ -26,6 +26,13 @@ export default function Configuracoes() {
                     descricao: 'Seus dados pessoais e profissionais',
                     rota: '/consultor/perfil',
                     cor: Colors.primary,
+                },
+                {
+                    icone: HandCoins,
+                    titulo: 'Assinatura',
+                    descricao: 'Situação do seu plano e vencimento',
+                    rota: '/consultor/assinatura',
+                    cor: Colors.info,
                 },
             ],
         },

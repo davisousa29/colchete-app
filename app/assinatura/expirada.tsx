@@ -10,35 +10,43 @@ import { router, useFocusEffect } from 'expo-router'
 import { LockKeyhole } from 'lucide-react-native'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
 import { globalStyles } from '@/src/constants/globalStyles'
+import { SITE_LINK_HABILITADO } from '@/src/constants/features'
 import { getSubscriptionStatus } from '@/src/services/subscriptionService'
 import { logout } from '@/src/services/authService'
 import { useAuthStore } from '@/src/store/authStore'
+import AvisoContaSite from '@/src/components/Subscription/AvisoContaSite'
+import { abrirSite } from '@/src/utils/site'
+import { toastInfo } from '@/src/utils/toast'
 
 export default function AssinaturaExpirada() {
     const { clearUser } = useAuthStore()
     const [loading, setLoading] = useState(true)
-    const [status, setStatus] = useState<string>('')
+    const [verificando, setVerificando] = useState(false)
 
     useFocusEffect(
         useCallback(() => {
-            verificar()
+            verificar(false)
         }, [])
     )
 
-    async function verificar() {
-        setLoading(true)
+    // aoTocar = a pessoa tocou em "Já renovei": avisa se ainda não encontrou
+    async function verificar(aoTocar: boolean) {
+        if (aoTocar) setVerificando(true)
         try {
             const s = await getSubscriptionStatus()
-            // Se por acaso a assinatura voltou a ficar ativa, manda pra home
+            // A assinatura voltou a ficar ativa (renovada no site): volta para a home
             if (s.is_active) {
                 router.replace('/consultor/home')
                 return
             }
-            setStatus(s.status)
+            if (aoTocar) {
+                toastInfo('Ainda não encontramos a renovação. Se você acabou de pagar, aguarde alguns instantes e tente de novo.')
+            }
         } catch {
             // silencioso
         } finally {
             setLoading(false)
+            setVerificando(false)
         }
     }
 
@@ -64,24 +72,39 @@ export default function AssinaturaExpirada() {
 
             <Text style={styles.titulo}>Sua assinatura expirou</Text>
 
-            <Text style={styles.descricao}>
-                Para continuar usando o Colchete, escolha um plano e retome o acesso a
-                todas as funcionalidades.
-            </Text>
+            <View style={styles.aviso}>
+                <AvisoContaSite />
+            </View>
 
             <View style={styles.avisoDados}>
                 <Text style={styles.avisoTexto}>
-                    Seus dados estão protegidos e serão mantidos por um período. Assine
-                    para não perder nenhuma informação.
+                    Seus dados estão protegidos e serão mantidos por um período. Renove para não perder
+                    nenhuma informação.
                 </Text>
             </View>
 
+            {SITE_LINK_HABILITADO && (
+                <TouchableOpacity
+                    style={[globalStyles.buttonPrimary, styles.botaoLargo]}
+                    onPress={() => abrirSite('/assinatura')}
+                    activeOpacity={0.8}
+                >
+                    <Text style={globalStyles.buttonPrimaryText}>Acessar minha conta no site</Text>
+                </TouchableOpacity>
+            )}
+
+            {/* Quem renovou no site volta aqui e confere, sem sair e entrar de novo */}
             <TouchableOpacity
-                style={[globalStyles.buttonPrimary, styles.botaoPlanos]}
-                onPress={() => router.push('/assinatura/planos' as any)}
+                style={[globalStyles.buttonSecondary, styles.botaoLargo, verificando && globalStyles.buttonDisabled]}
+                onPress={() => verificar(true)}
+                disabled={verificando}
                 activeOpacity={0.8}
             >
-                <Text style={globalStyles.buttonPrimaryText}>Ver planos</Text>
+                {verificando ? (
+                    <ActivityIndicator color={Colors.primary} />
+                ) : (
+                    <Text style={globalStyles.buttonSecondaryText}>Já renovei</Text>
+                )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.botaoSair} onPress={handleSair} activeOpacity={0.7}>
@@ -113,11 +136,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: Spacing.sm,
     },
-    descricao: {
-        fontSize: FontSize.md,
-        color: Colors.gray[600],
-        textAlign: 'center',
-        lineHeight: 22,
+    aviso: {
         marginBottom: Spacing.lg,
     },
     avisoDados: {
@@ -132,7 +151,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 20,
     },
-    botaoPlanos: {
+    botaoLargo: {
         width: '100%',
         marginBottom: Spacing.md,
     },

@@ -30,6 +30,7 @@ import {
     formatarDataBr,
     IDADE_MINIMA_CADASTRO,
 } from '@/src/utils/datas'
+import { EMAIL_SUPORTE } from '@/src/constants/site'
 
 type ModalState = {
     visible: boolean
@@ -366,8 +367,7 @@ export default function Perfil() {
                     )}
 
                     <Text style={styles.dicaLeitura}>
-                        Para alterar email, CPF, nome de usuário ou data de nascimento, fale com o suporte:
-                        colchete.gestaodefazendas@gmail.com
+                        Para alterar email, CPF, nome de usuário ou data de nascimento, fale com o suporte: {EMAIL_SUPORTE}
                     </Text>
 
                     {/* ── Contato ────────────────────────────────────────── */}

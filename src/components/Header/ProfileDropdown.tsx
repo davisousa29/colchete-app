@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
     View,
     Text,
@@ -10,6 +11,8 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
 import { Icons } from '@/src/constants/icons'
 import { useAuthStore } from '@/src/store/authStore'
 import { logout } from '@/src/services/authService'
+import { useSuporteStore } from '@/src/store/suporteStore'
+import { abrirWhatsapp } from '@/src/utils/whatsapp'
 
 interface Props {
     visible: boolean
@@ -18,6 +21,17 @@ interface Props {
 
 export default function ProfileDropdown({ visible, onClose }: Props) {
     const { clearUser } = useAuthStore()
+
+    const { contato, carregar } = useSuporteStore()
+
+    useEffect(() => {
+        if (visible) carregar()
+    }, [visible])
+
+    async function handleSuporte() {
+        onClose()
+        await abrirWhatsapp(contato!.whatsapp!, contato!.mensagem)
+    }
 
     function handleNavigate(path: string) {
         onClose()
@@ -61,6 +75,21 @@ export default function ProfileDropdown({ visible, onClose }: Props) {
                     </TouchableOpacity>
 
                     <View style={styles.divider} />
+
+                    {contato?.whatsapp && (
+                        <>
+                            <TouchableOpacity
+                                style={styles.item}
+                                onPress={handleSuporte}
+                                activeOpacity={0.7}
+                            >
+                                <Icons.messageCircle size={20} color={Colors.info} />
+                                <Text style={styles.itemLabel}>Suporte</Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.divider} />
+                        </>
+                    )}
 
                     <TouchableOpacity
                         style={styles.item}

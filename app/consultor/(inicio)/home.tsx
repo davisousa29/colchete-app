@@ -8,6 +8,7 @@ import { Colors, Spacing } from '@/src/constants'
 import { getSubscriptionStatus, SubscriptionStatus } from '@/src/services/subscriptionService'
 import SubscriptionBanner from '@/src/components/Subscription/SubscriptionBanner'
 import QuickShortcuts from '@/src/components/QuickShortcuts/QuickShortcuts'
+import BotaoSuporte, { ESPACO_BOTAO_SUPORTE } from '@/src/components/Suporte/BotaoSuporte'
 
 export default function Home() {
 
@@ -47,39 +48,43 @@ export default function Home() {
     }, [user])
 
     return (
-        <ScrollView
-            style={styles.screen}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-        >
-            <SubscriptionBanner subscription={subscription} />
+        <View style={styles.screen}>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={[styles.content, { paddingBottom: ESPACO_BOTAO_SUPORTE + Spacing.xl }]}
+                showsVerticalScrollIndicator={false}
+            >
+                <SubscriptionBanner subscription={subscription} />
 
-            <View style={styles.cardUserDescrible}>
+                <View style={styles.cardUserDescrible}>
 
-                <Image
-                    source={require('@/assets/png-files/box-initial.png')}
-                    style={styles.image}
-                />
+                    <Image
+                        source={require('@/assets/png-files/box-initial.png')}
+                        style={styles.image}
+                    />
 
-                <View style={styles.cardContent}>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Especialista em {profile?.specialization}</Text>
+                    <View style={styles.cardContent}>
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>Especialista em {profile?.specialization}</Text>
+                        </View>
+
+                        <Text style={styles.title}>
+                            Seja bem vindo,{' '}
+                            <Text style={styles.highlight}>{user?.name}</Text>
+                        </Text>
+
+                        <Text style={styles.subtitle}>
+                            {profile?.bio}.
+                        </Text>
                     </View>
 
-                    <Text style={styles.title}>
-                        Seja bem vindo,{' '}
-                        <Text style={styles.highlight}>{user?.name}</Text>
-                    </Text>
-
-                    <Text style={styles.subtitle}>
-                        {profile?.bio}.
-                    </Text>
                 </View>
 
-            </View>
+                <QuickShortcuts />
+            </ScrollView>
 
-            <QuickShortcuts />
-        </ScrollView>
+            <BotaoSuporte />
+        </View>
     )
 }
 

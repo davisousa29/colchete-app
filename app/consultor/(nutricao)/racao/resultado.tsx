@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import { globalStyles } from '@/src/constants/globalStyles'
 import BackButton from '@/src/components/Header/BackButton'
 import CentralModal from '@/src/components/Modal/CentralModal'
 import api from '@/src/services/api'
+import { calcularFormulacao, CalculoFormulacao } from '@/src/services/racaoService'
 import { formatarNumero } from '@/src/utils/numbers'
 import { currencyMask } from '@/src/utils/masks/currencyMask'
 import { Icons } from '@/src/constants/icons'
@@ -79,6 +80,7 @@ export default function RacaoStep4() {
 
     const exig = {
         cms:  Number(params.exig_cms_kg),
+        ndt:  Number(params.exig_ndt_kg),
         elm:  Number(params.exig_elm_mcal),
         elg:  Number(params.exig_elg_mcal),
         pb:   Number(params.exig_pb_g),
@@ -88,10 +90,36 @@ export default function RacaoStep4() {
 
     const quantidade = Number(params.quantidade ?? 1)
 
-    const custoAnimalDia = ingredientes.reduce((acc, ing) => {
-        return acc + (ing.preco_kg_local * (exig.cms * ing.proporcao_pct / 100))
-    }, 0)
+    // Cálculo feito pelo backend (rota de prévia), o mesmo usado ao salvar:
+    // a tela mostra exatamente o que vai ficar gravado na formulação e no PDF.
+    const [calculo, setCalculo] = useState<CalculoFormulacao | null>(null)
+    const [carregandoCalculo, setCarregandoCalculo] = useState(true)
+    const [erroCalculo, setErroCalculo] = useState<string | null>(null)
 
+    const carregarCalculo = useCallback(async () => {
+        setCarregandoCalculo(true)
+        setErroCalculo(null)
+        try {
+            setCalculo(await calcularFormulacao(exig.cms, ingredientes.map(ing => ({
+                ingrediente_id: ing.ingrediente_id,
+                tipo:           ing.tipo,
+                proporcao_pct:  ing.proporcao_pct,
+                preco_kg_local: ing.preco_kg_local,
+            }))))
+        } catch (error: any) {
+            setErroCalculo(error.response?.data?.message || 'Não foi possível calcular a formulação.')
+        } finally {
+            setCarregandoCalculo(false)
+        }
+        // Os parâmetros da rota não mudam enquanto a tela está aberta
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [params.ingredientes, params.exig_cms_kg])
+
+    useEffect(() => {
+        carregarCalculo()
+    }, [carregarCalculo])
+
+    const custoAnimalDia = calculo?.totais.custo_animal_dia ?? 0
     const custoLoteDia = custoAnimalDia * quantidade
 
     async function buscarContratosAtivos() {
@@ -130,6 +158,7 @@ export default function RacaoStep4() {
                 quantidade_animais: quantidade,
                 tipo_aplicacao:     params.tipo_aplicacao,
                 exig_cms_kg:        exig.cms,
+                exig_ndt_kg:        exig.ndt,
                 exig_elm_mcal:      exig.elm,
                 exig_elg_mcal:      exig.elg,
                 exig_pb_g:          exig.pb,
@@ -197,100 +226,125 @@ export default function RacaoStep4() {
                     <Text style={globalStyles.pageSubtitle}>Passo 4 de 4 — Balanço nutricional da formulação</Text>
                 </View>
 
-                {/* Resumo do lote */}
-                <View style={styles.secao}>
-                    <Text style={styles.secaoTitulo}>Resumo</Text>
-                    <View style={styles.resumoGrid}>
-                        <View style={styles.resumoCard}>
-                            <Icons.pawPrint size={25} color={Colors.primary} />
-                            <Text style={styles.resumoValor}>{quantidade}</Text>
-                            <Text style={styles.resumoLabel}>anim{quantidade > 1 ? 'ais' : 'al'}</Text>
-                        </View>
-                        <View style={styles.resumoCard}>
-                            <Icons.scale size={25} color={Colors.primary} />
-                            <Text style={styles.resumoValor}>{formatarNumero(exig.cms, 2)}</Text>
-                            <Text style={styles.resumoLabel}>kg MS/animal/dia</Text>
-                        </View>
-                        <View style={styles.resumoCard}>
-                            <Icons.dolar size={25} color={Colors.primary} />
-                            <Text style={styles.resumoValor}>R$ {currencyMask(String(Math.round(custoAnimalDia * 100)))}</Text>
-                            <Text style={styles.resumoLabel}>custo/animal/dia</Text>
-                        </View>
-                        <View style={styles.resumoCard}>
-                            <Icons.handCoins size={25} color={Colors.primary} />
-                            <Text style={styles.resumoValor}>R$ {currencyMask(String(Math.round(custoLoteDia * 100)))}</Text>
-                            <Text style={styles.resumoLabel}>custo total/dia</Text>
-                        </View>
+                {carregandoCalculo ? (
+                    <View style={styles.estadoCalculo}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.estadoCalculoTexto}>Calculando a formulação...</Text>
                     </View>
-                </View>
-
-                {/* Composição da dieta */}
-                <View style={styles.secao}>
-                    <Text style={styles.secaoTitulo}>Composição da dieta</Text>
-                    <View style={styles.card}>
-                        {ingredientes.map((ing, index) => (
-                            <View key={ing.ingrediente_id}>
-                                {index > 0 && <View style={styles.divisor} />}
-                                <View style={styles.ingRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.ingNome}>{ing.nome}</Text>
-                                        <Text style={styles.ingTipo}>{ing.tipo.replace(/_/g, ' ')}</Text>
-                                    </View>
-                                    <View style={styles.ingDireita}>
-                                        <Text style={styles.ingProporcao}>{ing.proporcao_pct}%</Text>
-                                        <Text style={styles.ingConsumo}>
-                                            {formatarNumero(exig.cms * ing.proporcao_pct / 100, 3)} kg MS/dia
-                                        </Text>
-                                    </View>
+                ) : erroCalculo || !calculo ? (
+                    <View style={[styles.card, styles.estadoCalculo]}>
+                        <Text style={styles.estadoCalculoTexto}>{erroCalculo}</Text>
+                        <TouchableOpacity
+                            style={[globalStyles.buttonSecondary, { alignSelf: 'stretch' }]}
+                            onPress={carregarCalculo}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={globalStyles.buttonSecondaryText}>Tentar de novo</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <>
+                        {/* Resumo do lote */}
+                        <View style={styles.secao}>
+                            <Text style={styles.secaoTitulo}>Resumo</Text>
+                            <View style={styles.resumoGrid}>
+                                <View style={styles.resumoCard}>
+                                    <Icons.pawPrint size={25} color={Colors.primary} />
+                                    <Text style={styles.resumoValor}>{quantidade}</Text>
+                                    <Text style={styles.resumoLabel}>anim{quantidade > 1 ? 'ais' : 'al'}</Text>
+                                </View>
+                                <View style={styles.resumoCard}>
+                                    <Icons.scale size={25} color={Colors.primary} />
+                                    <Text style={styles.resumoValor}>{formatarNumero(exig.cms, 2)}</Text>
+                                    <Text style={styles.resumoLabel}>kg MS/animal/dia</Text>
+                                </View>
+                                <View style={styles.resumoCard}>
+                                    <Icons.dolar size={25} color={Colors.primary} />
+                                    <Text style={styles.resumoValor}>R$ {currencyMask(String(Math.round(custoAnimalDia * 100)))}</Text>
+                                    <Text style={styles.resumoLabel}>custo/animal/dia</Text>
+                                </View>
+                                <View style={styles.resumoCard}>
+                                    <Icons.handCoins size={25} color={Colors.primary} />
+                                    <Text style={styles.resumoValor}>R$ {currencyMask(String(Math.round(custoLoteDia * 100)))}</Text>
+                                    <Text style={styles.resumoLabel}>custo total/dia</Text>
                                 </View>
                             </View>
-                        ))}
-                    </View>
-                </View>
+                        </View>
 
-                {/* Balanço nutricional */}
-                <View style={styles.secao}>
-                    <Text style={styles.secaoTitulo}>Balanço nutricional</Text>
-                    <Text style={styles.secaoSubtitulo}>Fornecido vs Exigido pelo animal</Text>
-                    <View style={styles.card}>
-                        <BalancoItem
-                            label="Energia Líquida Mantença"
-                            fornecido={exig.cms * ingredientes.reduce((acc, ing) => acc + (Number(ing.proporcao_pct) / 100), 0)}
-                            exigido={exig.elm}
-                            unidade="Mcal"
-                        />
-                        <View style={styles.divisor} />
-                        <BalancoItem
-                            label="Proteína Bruta"
-                            fornecido={exig.cms * 120}
-                            exigido={exig.pb}
-                            unidade="g"
-                        />
-                        <View style={styles.divisor} />
-                        <BalancoItem
-                            label="Cálcio"
-                            fornecido={exig.cms * 4.0}
-                            exigido={exig.ca}
-                            unidade="g"
-                        />
-                        <View style={styles.divisor} />
-                        <BalancoItem
-                            label="Fósforo"
-                            fornecido={exig.cms * 2.8}
-                            exigido={exig.p}
-                            unidade="g"
-                        />
-                    </View>
-                </View>
+                        {/* Composição da dieta */}
+                        <View style={styles.secao}>
+                            <Text style={styles.secaoTitulo}>Composição da dieta</Text>
+                            <View style={styles.card}>
+                                {calculo.itens.map((ing, index) => (
+                                    <View key={ing.ingrediente_id}>
+                                        {index > 0 && <View style={styles.divisor} />}
+                                        <View style={styles.ingRow}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.ingNome}>{ing.nome}</Text>
+                                                <Text style={styles.ingTipo}>
+                                                    {ing.tipo.replace(/_/g, ' ')} · MS: {formatarNumero(ing.ms_pct, 0)}%
+                                                </Text>
+                                                <Text style={styles.ingConsumo}>
+                                                    {formatarNumero(ing.consumo_ms_kg, 3)} kg MS/dia · {formatarNumero(ing.consumo_mn_kg, 3)} kg MN/dia
+                                                </Text>
+                                            </View>
+                                            <View style={styles.ingDireita}>
+                                                <Text style={styles.ingProporcao}>{ing.proporcao_pct.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</Text>
+                                                <Text style={styles.ingConsumo}>
+                                                    R$ {formatarNumero(ing.custo_animal_dia, 3)}/dia
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Balanço nutricional */}
+                        <View style={styles.secao}>
+                            <Text style={styles.secaoTitulo}>Balanço nutricional</Text>
+                            <Text style={styles.secaoSubtitulo}>Fornecido vs Exigido pelo animal</Text>
+                            <View style={styles.card}>
+                                <BalancoItem
+                                    label="Energia Líquida Mantença"
+                                    fornecido={calculo.totais.contrib_elm_mcal}
+                                    exigido={exig.elm}
+                                    unidade="Mcal"
+                                />
+                                <View style={styles.divisor} />
+                                <BalancoItem
+                                    label="Proteína Bruta"
+                                    fornecido={calculo.totais.contrib_pb_g}
+                                    exigido={exig.pb}
+                                    unidade="g"
+                                />
+                                <View style={styles.divisor} />
+                                <BalancoItem
+                                    label="Cálcio"
+                                    fornecido={calculo.totais.contrib_ca_g}
+                                    exigido={exig.ca}
+                                    unidade="g"
+                                />
+                                <View style={styles.divisor} />
+                                <BalancoItem
+                                    label="Fósforo"
+                                    fornecido={calculo.totais.contrib_p_g}
+                                    exigido={exig.p}
+                                    unidade="g"
+                                />
+                            </View>
+                        </View>
+                    </>
+                )}
 
                 {/* Ações */}
                 <View style={styles.secao}>
                     <Text style={styles.secaoTitulo}>O que deseja fazer?</Text>
 
                     <TouchableOpacity
-                        style={[globalStyles.buttonPrimary, salvando && globalStyles.buttonDisabled]}
+                        style={[globalStyles.buttonPrimary, (salvando || !calculo) && globalStyles.buttonDisabled]}
                         onPress={() => handleSalvar()}
-                        disabled={salvando}
+                        disabled={salvando || !calculo}
                         activeOpacity={0.8}
                     >
                         {salvando ? (
@@ -307,10 +361,10 @@ export default function RacaoStep4() {
                         style={[
                             globalStyles.buttonSecondary,
                             { marginTop: Spacing.sm },
-                            loadingContratos && globalStyles.buttonDisabled,
+                            (loadingContratos || !calculo) && globalStyles.buttonDisabled,
                         ]}
                         onPress={buscarContratosAtivos}
-                        disabled={loadingContratos}
+                        disabled={loadingContratos || !calculo}
                         activeOpacity={0.8}
                     >
                         {loadingContratos ? (
@@ -440,6 +494,8 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 3,
     },
+    estadoCalculo: { alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xl, marginBottom: Spacing.xl },
+    estadoCalculoTexto: { fontSize: FontSize.sm, color: Colors.gray[600], textAlign: 'center' },
     divisor: { height: 1, backgroundColor: Colors.gray[200], marginVertical: Spacing.sm },
     ingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
     ingNome: { fontSize: FontSize.md, fontWeight: '600', color: Colors.black },

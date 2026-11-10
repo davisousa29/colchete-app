@@ -209,6 +209,7 @@ export default function FormulacaoDetalheScreen() {
                 quantidade_animais: programa!.quantidade_animais,
                 tipo_aplicacao:     programa!.tipo_aplicacao,
                 exig_cms_kg:        Number(programa!.exig_cms_kg),
+                exig_ndt_kg:        programa!.exig_ndt_kg != null ? Number(programa!.exig_ndt_kg) : null,
                 exig_elm_mcal:      Number(programa!.exig_elm_mcal),
                 exig_elg_mcal:      Number(programa!.exig_elg_mcal),
                 exig_pb_g:          Number(programa!.exig_pb_g),
@@ -387,7 +388,7 @@ export default function FormulacaoDetalheScreen() {
                                             <Text style={styles.ingConsumo}>{formatarNumero(Number(ing.consumo_ms_kg), 3)} kg MS/dia · {formatarNumero(Number(ing.consumo_mn_kg), 3)} kg MN/dia</Text>
                                         </View>
                                         <View style={styles.ingDireita}>
-                                            <Text style={styles.ingProporcao}>{Number(ing.proporcao_pct).toFixed(0)}%</Text>
+                                            <Text style={styles.ingProporcao}>{Number(ing.proporcao_pct).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</Text>
                                             <Text style={styles.ingCusto}>R$ {Number(ing.custo_animal_dia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia</Text>
                                         </View>
                                     </View>

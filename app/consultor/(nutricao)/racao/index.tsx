@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, type ComponentRef } from 'react'
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Platform,
+    Keyboard,
 } from 'react-native'
 import { router } from 'expo-router'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
@@ -18,7 +19,7 @@ import FilterChips, { FilterChip } from '@/src/components/Filter/FilterChips'
 import CentralModal from '@/src/components/Modal/CentralModal'
 import PesoInput from '@/src/components/Input/PesoInput'
 import api from '@/src/services/api'
-import { sanitizarNumero, parsearNumero, isNumeroValido } from '@/src/utils/numbers'
+import { sanitizarNumero } from '@/src/utils/numbers'
 import { pesoParaNumero } from '@/src/utils/masks'
 
 interface Especie { id: string; nome: string }
@@ -51,6 +52,10 @@ export default function RacaoStep1() {
     const [quantidade, setQuantidade] = useState('1')
     const [tipoAplicacao, setTipoAplicacao] = useState<'individual' | 'lote'>('lote')
 
+    const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null)
+    const telaRef = useRef<ComponentRef<typeof View>>(null)
+    const [offsetTopo, setOffsetTopo] = useState(0)
+
     useEffect(() => {
         carregarEspecies()
     }, [])
@@ -63,6 +68,13 @@ export default function RacaoStep1() {
             carregarDadosEspecie(especieSelecionada)
         }
     }, [especieSelecionada])
+
+    useEffect(() => {
+        const sub = Keyboard.addListener('keyboardDidShow', () => {
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+        })
+        return () => sub.remove()
+    }, [])
 
     async function carregarEspecies() {
         try {
@@ -105,8 +117,8 @@ export default function RacaoStep1() {
         if (pesoParaNumero(pesoInicial) <= 0) return 'Informe o peso inicial.'
         if (pesoParaNumero(pesoFinal) <= 0) return 'Informe o peso final.'
         if (pesoParaNumero(pesoInicial) >= pesoParaNumero(pesoFinal)) return 'O peso final deve ser maior que o peso inicial.'
-        if (!isNumeroValido(gmd)) return 'Informe o ganho médio diário.'
-        if (parsearNumero(gmd) <= 0 || parsearNumero(gmd) > 3) return 'O GMD deve ser entre 0.1 e 3 kg/dia.'
+        if (pesoParaNumero(gmd) <= 0) return 'Informe o ganho médio diário.'
+        if (pesoParaNumero(gmd) < 0.1 || pesoParaNumero(gmd) > 3) return 'O GMD deve ser entre 0,1 e 3 kg/dia.'
         if (tipoAplicacao === 'lote' && (!quantidade || Number(quantidade) < 1)) return 'Informe a quantidade de animais.'
         return null
     }
@@ -127,7 +139,7 @@ export default function RacaoStep1() {
                 sistema_id: sistemaSelecionado,
                 peso_inicial: String(pesoParaNumero(pesoInicial)),
                 peso_final: String(pesoParaNumero(pesoFinal)),
-                gmd: String(parsearNumero(gmd)),
+                gmd: String(pesoParaNumero(gmd)),
                 quantidade,
                 tipo_aplicacao: tipoAplicacao,
                 especie_nome: especies.find(e => e.id === especieSelecionada)?.nome ?? '',
@@ -148,125 +160,128 @@ export default function RacaoStep1() {
     ]
 
     return (
-        <KeyboardAvoidingView
+        <View
+            ref={telaRef}
             style={globalStyles.screen}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={100}
+            onLayout={() => telaRef.current?.measureInWindow((_x, y) => setOffsetTopo(y))}
         >
-            <ScrollView
-                contentContainerStyle={styles.scroll}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={offsetTopo}
             >
-                <BackButton />
+                <ScrollView
+                    ref={scrollRef}
+                    contentContainerStyle={styles.scroll}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <BackButton />
 
-                {/* Indicador de passo */}
-                <View style={styles.stepIndicator}>
-                    <View style={styles.stepAtivo}><Text style={styles.stepNumeroAtivo}>1</Text></View>
-                    <View style={styles.stepLinha} />
-                    <View style={styles.stepInativo}><Text style={styles.stepNumeroInativo}>2</Text></View>
-                    <View style={styles.stepLinha} />
-                    <View style={styles.stepInativo}><Text style={styles.stepNumeroInativo}>3</Text></View>
-                    <View style={styles.stepLinha} />
-                    <View style={styles.stepInativo}><Text style={styles.stepNumeroInativo}>4</Text></View>
-                </View>
+                    {/* Indicador de passo */}
+                    <View style={styles.stepIndicator}>
+                        <View style={styles.stepAtivo}><Text style={styles.stepNumeroAtivo}>1</Text></View>
+                        <View style={styles.stepLinha} />
+                        <View style={styles.stepInativo}><Text style={styles.stepNumeroInativo}>2</Text></View>
+                        <View style={styles.stepLinha} />
+                        <View style={styles.stepInativo}><Text style={styles.stepNumeroInativo}>3</Text></View>
+                        <View style={styles.stepLinha} />
+                        <View style={styles.stepInativo}><Text style={styles.stepNumeroInativo}>4</Text></View>
+                    </View>
 
-                <View style={styles.header}>
-                    <Text style={globalStyles.pageTitle}>Dados do Animal</Text>
-                    <Text style={globalStyles.pageSubtitle}>Passo 1 de 4 — Selecione as características do animal</Text>
-                </View>
+                    <View style={styles.header}>
+                        <Text style={globalStyles.pageTitle}>Dados do Animal</Text>
+                        <Text style={globalStyles.pageSubtitle}>Passo 1 de 4 — Selecione as características do animal</Text>
+                    </View>
 
-                {loading ? (
-                    <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.xl }} />
-                ) : (
-                    <View style={styles.form}>
+                    {loading ? (
+                        <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.xl }} />
+                    ) : (
+                        <View style={styles.form}>
 
-                        <View style={globalStyles.inputGroup}>
-                            <Text style={globalStyles.inputLabel}>Espécie *</Text>
-                            <FilterChips chips={especiesChips} selecionado={especieSelecionada} onChange={setEspecieSelecionada} />
-                        </View>
-
-                        {racas.length > 0 && (
                             <View style={globalStyles.inputGroup}>
-                                <Text style={globalStyles.inputLabel}>Raça *</Text>
-                                <FilterChips chips={racasChips} selecionado={racaSelecionada} onChange={setRacaSelecionada} />
+                                <Text style={globalStyles.inputLabel}>Espécie *</Text>
+                                <FilterChips chips={especiesChips} selecionado={especieSelecionada} onChange={setEspecieSelecionada} />
                             </View>
-                        )}
 
-                        {categorias.length > 0 && (
+                            {racas.length > 0 && (
+                                <View style={globalStyles.inputGroup}>
+                                    <Text style={globalStyles.inputLabel}>Raça *</Text>
+                                    <FilterChips chips={racasChips} selecionado={racaSelecionada} onChange={setRacaSelecionada} />
+                                </View>
+                            )}
+
+                            {categorias.length > 0 && (
+                                <View style={globalStyles.inputGroup}>
+                                    <Text style={globalStyles.inputLabel}>Categoria *</Text>
+                                    <FilterChips chips={categoriasChips} selecionado={categoriaSelecionada} onChange={setCategoriaSelecionada} />
+                                </View>
+                            )}
+
+                            {sistemas.length > 0 && (
+                                <View style={globalStyles.inputGroup}>
+                                    <Text style={globalStyles.inputLabel}>Sistema de produção *</Text>
+                                    <FilterChips chips={sistemasChips} selecionado={sistemaSelecionado} onChange={setSistemaSelecionado} />
+                                </View>
+                            )}
+
                             <View style={globalStyles.inputGroup}>
-                                <Text style={globalStyles.inputLabel}>Categoria *</Text>
-                                <FilterChips chips={categoriasChips} selecionado={categoriaSelecionada} onChange={setCategoriaSelecionada} />
+                                <Text style={globalStyles.inputLabel}>Tipo de aplicação *</Text>
+                                <FilterChips chips={tipoChips} selecionado={tipoAplicacao} onChange={v => setTipoAplicacao(v as 'individual' | 'lote')} />
                             </View>
-                        )}
 
-                        {sistemas.length > 0 && (
-                            <View style={globalStyles.inputGroup}>
-                                <Text style={globalStyles.inputLabel}>Sistema de produção *</Text>
-                                <FilterChips chips={sistemasChips} selecionado={sistemaSelecionado} onChange={setSistemaSelecionado} />
-                            </View>
-                        )}
+                            {tipoAplicacao === 'lote' && (
+                                <View style={globalStyles.inputGroup}>
+                                    <Text style={globalStyles.inputLabel}>Quantidade de animais *</Text>
+                                    <TextInput
+                                        style={globalStyles.input}
+                                        placeholder="Ex: 50"
+                                        placeholderTextColor={Colors.gray[400]}
+                                        value={quantidade}
+                                        onChangeText={text => setQuantidade(sanitizarNumero(text).replace(/[.,]/g, ''))}
+                                        keyboardType="number-pad"
+                                    />
+                                </View>
+                            )}
 
-                        <View style={globalStyles.inputGroup}>
-                            <Text style={globalStyles.inputLabel}>Tipo de aplicação *</Text>
-                            <FilterChips chips={tipoChips} selecionado={tipoAplicacao} onChange={v => setTipoAplicacao(v as 'individual' | 'lote')} />
-                        </View>
-
-                        {tipoAplicacao === 'lote' && (
-                            <View style={globalStyles.inputGroup}>
-                                <Text style={globalStyles.inputLabel}>Quantidade de animais *</Text>
-                                <TextInput
-                                    style={globalStyles.input}
-                                    placeholder="Ex: 50"
-                                    placeholderTextColor={Colors.gray[400]}
-                                    value={quantidade}
-                                    onChangeText={text => setQuantidade(sanitizarNumero(text).replace(/[.,]/g, ''))}
-                                    keyboardType="number-pad"
+                            <View style={styles.duasColunas}>
+                                <PesoInput
+                                    label="Peso inicial *"
+                                    value={pesoInicial}
+                                    onChange={setPesoInicial}
+                                    placeholder="Ex: 300,00"
+                                    style={{ flex: 1 }}
+                                />
+                                <PesoInput
+                                    label="Peso final *"
+                                    value={pesoFinal}
+                                    onChange={setPesoFinal}
+                                    placeholder="Ex: 400,00"
+                                    style={{ flex: 1 }}
                                 />
                             </View>
-                        )}
 
-                        <View style={styles.duasColunas}>
                             <PesoInput
-                                label="Peso inicial *"
-                                value={pesoInicial}
-                                onChange={setPesoInicial}
-                                placeholder="Ex: 300"
-                                style={{ flex: 1 }}
-                            />
-                            <PesoInput
-                                label="Peso final *"
-                                value={pesoFinal}
-                                onChange={setPesoFinal}
-                                placeholder="Ex: 400"
-                                style={{ flex: 1 }}
-                            />
-                        </View>
-
-                        <View style={globalStyles.inputGroup}>
-                            <Text style={globalStyles.inputLabel}>Ganho médio diário — GMD (kg/dia) *</Text>
-                            <TextInput
-                                style={globalStyles.input}
-                                placeholder="Ex: 0.5"
-                                placeholderTextColor={Colors.gray[400]}
+                                label="Ganho médio diário — GMD *"
                                 value={gmd}
-                                onChangeText={text => setGmd(sanitizarNumero(text))}
-                                keyboardType="decimal-pad"
+                                onChange={setGmd}
+                                placeholder="Ex: 0,85"
+                                unidade="kg/dia"
+                                maxInteiros={1}
                             />
-                            <Text style={globalStyles.inputHint}>Entre 0.1 e 3 kg/dia</Text>
+
+                            <TouchableOpacity
+                                style={globalStyles.buttonPrimary}
+                                onPress={handleProximo}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={globalStyles.buttonPrimaryText}>Próximo →</Text>
+                            </TouchableOpacity>
+
                         </View>
-
-                        <TouchableOpacity
-                            style={globalStyles.buttonPrimary}
-                            onPress={handleProximo}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={globalStyles.buttonPrimaryText}>Próximo →</Text>
-                        </TouchableOpacity>
-
-                    </View>
-                )}
-            </ScrollView>
+                    )}
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             <CentralModal
                 visible={modal.visible}
@@ -275,7 +290,7 @@ export default function RacaoStep1() {
                 type={modal.type}
                 onClose={() => setModal({ ...modal, visible: false })}
             />
-        </KeyboardAvoidingView>
+        </View>
     )
 }
 

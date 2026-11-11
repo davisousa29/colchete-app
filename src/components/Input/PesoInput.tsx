@@ -10,10 +10,11 @@ interface Props {
     placeholder?: string
     hint?: string
     style?: StyleProp<ViewStyle>
+    unidade?: string
+    maxInteiros?: number
 }
 
-// Campo de peso com a unidade "kg" fixa à direita (fora do texto, para não atrapalhar o cursor)
-export default function PesoInput({ label, value, onChange, placeholder, hint, style }: Props) {
+export default function PesoInput({ label, value, onChange, placeholder, hint, style, unidade = 'kg', maxInteiros = 4 }: Props) {
     return (
         <View style={[globalStyles.inputGroup, style]}>
             <Text style={globalStyles.inputLabel}>{label}</Text>
@@ -22,12 +23,12 @@ export default function PesoInput({ label, value, onChange, placeholder, hint, s
                 <TextInput
                     style={styles.input}
                     value={value}
-                    onChangeText={texto => onChange(formatarPeso(texto))}
+                    onChangeText={texto => onChange(formatarPeso(texto, maxInteiros))}
                     placeholder={placeholder}
                     placeholderTextColor={Colors.gray[400]}
-                    keyboardType="decimal-pad"
+                    keyboardType="number-pad"
                 />
-                <Text style={styles.unidade}>kg</Text>
+                <Text style={styles.unidade}>{unidade}</Text>
             </View>
 
             {hint && <Text style={globalStyles.inputHint}>{hint}</Text>}

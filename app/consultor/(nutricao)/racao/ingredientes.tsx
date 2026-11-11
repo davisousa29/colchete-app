@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, type ComponentRef } from 'react'
 import {
     View,
     Text,
@@ -7,9 +7,12 @@ import {
     FlatList,
     ActivityIndicator,
     TextInput,
+    KeyboardAvoidingView,
+    Platform,
+    Keyboard,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import { Check, Plus, Minus } from 'lucide-react-native'
+import { Check } from 'lucide-react-native'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
 import { globalStyles } from '@/src/constants/globalStyles'
 import BackButton from '@/src/components/Header/BackButton'
@@ -19,7 +22,6 @@ import CentralModal from '@/src/components/Modal/CentralModal'
 import api from '@/src/services/api'
 import { sanitizarNumero, parsearNumero } from '@/src/utils/numbers'
 import { currencyMask, parseCurrency } from '@/src/utils/masks/currencyMask'
-import { Keyboard, TouchableWithoutFeedback } from 'react-native'
 
 interface Ingrediente {
     id: string
@@ -71,6 +73,11 @@ export default function RacaoStep3() {
         message: '',
         type: 'default' as 'default' | 'success' | 'error',
     })
+    const listaRef = useRef<FlatList<Ingrediente>>(null)
+    const itemEmFoco = useRef<string | null>(null)
+
+    const telaRef = useRef<ComponentRef<typeof View>>(null)
+    const [offsetTopo, setOffsetTopo] = useState(0)
 
     useEffect(() => {
         carregarIngredientes()
@@ -157,6 +164,27 @@ export default function RacaoStep3() {
         } as any)
     }
 
+    function rolarAteItem(id: string) {
+        const index = ingredientesFiltrados.findIndex(i => i.id === id)
+        if (index < 0) return
+
+        listaRef.current?.scrollToIndex({ index, viewPosition: 1, animated: true })
+    }
+
+    useEffect(() => {
+        const sub = Keyboard.addListener('keyboardDidShow', () => {
+            if (itemEmFoco.current) {
+                setTimeout(() => rolarAteItem(itemEmFoco.current!), 100)
+            }
+        })
+        return () => sub.remove()
+    }, [ingredientesFiltrados])
+
+    function aoFocarCampo(id: string) {
+        itemEmFoco.current = id
+        if (Keyboard.isVisible()) rolarAteItem(id)
+    }
+
     function renderIngrediente({ item }: { item: Ingrediente }) {
         const selecionado = isSelecionado(item.id)
         const sel = selecionados.find(s => s.ingrediente.id === item.id)
@@ -211,6 +239,7 @@ export default function RacaoStep3() {
                                     value={sel.proporcao_pct}
                                     onChangeText={v => atualizarSelecionado(item.id, 'proporcao_pct', sanitizarNumero(v))}
                                     keyboardType="decimal-pad"
+                                    onFocus={() => aoFocarCampo(item.id)}
                                 />
                             </View>
                             <View style={[globalStyles.inputGroup, { flex: 1 }]}>
@@ -222,6 +251,7 @@ export default function RacaoStep3() {
                                     value={sel.preco_kg_local}
                                     onChangeText={v => atualizarSelecionado(item.id, 'preco_kg_local', currencyMask(v))}
                                     keyboardType="number-pad"
+                                    onFocus={() => aoFocarCampo(item.id)}
                                 />
                             </View>
                         </View>
@@ -235,21 +265,38 @@ export default function RacaoStep3() {
     const totalCor = total === 100 ? Colors.success : total > 100 ? Colors.error : Colors.warning
 
     return (
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={globalStyles.screen}>
+        <View
+            ref={telaRef}
+            style={globalStyles.screen}
+            onLayout={() => telaRef.current?.measureInWindow((_x, y) => setOffsetTopo(y))}
+        >
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={offsetTopo}
+            >
                 {loading ? (
                     <View style={[globalStyles.center, { flex: 1 }]}>
                         <ActivityIndicator size="large" color={Colors.primary} />
                     </View>
                 ) : (
                     <FlatList
+                        ref={listaRef}
+                        style={{ flex: 1 }}
                         data={ingredientesFiltrados}
                         keyExtractor={item => item.id}
                         renderItem={renderIngrediente}
                         contentContainerStyle={styles.lista}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
-                        onScrollBeginDrag={Keyboard.dismiss}
+                        keyboardDismissMode="on-drag"
+                        onScrollToIndexFailed={info => {
+                            // Item ainda não medido (cards têm alturas diferentes): rolagem aproximada
+                            listaRef.current?.scrollToOffset({
+                                offset: info.averageItemLength * info.index,
+                                animated: true,
+                            })
+                        }}
                         ListHeaderComponent={
                             <View style={styles.headerFixo}>
                                 <BackButton />
@@ -302,16 +349,16 @@ export default function RacaoStep3() {
                         </TouchableOpacity>
                     </View>
                 )}
+            </KeyboardAvoidingView>
 
-                <CentralModal
-                    visible={modal.visible}
-                    title={modal.title}
-                    message={modal.message}
-                    type={modal.type}
-                    onClose={() => setModal({ ...modal, visible: false })}
-                />
-            </View>
-        </TouchableWithoutFeedback>
+            <CentralModal
+                visible={modal.visible}
+                title={modal.title}
+                message={modal.message}
+                type={modal.type}
+                onClose={() => setModal({ ...modal, visible: false })}
+            />
+        </View>
     )
 }
 
@@ -350,7 +397,7 @@ const styles = StyleSheet.create({
     lista: {
         paddingHorizontal: Spacing.lg,
         paddingTop: Spacing.sm,
-        paddingBottom: 100,
+        paddingBottom: Spacing.lg,
         gap: Spacing.sm,
     },
     card: {
@@ -397,8 +444,6 @@ const styles = StyleSheet.create({
     tipoChipTextAtivo: { color: Colors.white },
     configRow: { flexDirection: 'row', gap: Spacing.sm },
     footer: {
-        position: 'absolute',
-        bottom: 0, left: 0, right: 0,
         padding: Spacing.lg,
         backgroundColor: Colors.white,
         borderTopWidth: 1,

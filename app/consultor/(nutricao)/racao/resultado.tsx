@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
+    TextInput,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, FontSize, BorderRadius } from '@/src/constants'
@@ -89,9 +90,9 @@ export default function RacaoStep4() {
     }
 
     const quantidade = Number(params.quantidade ?? 1)
+    const nomeSugerido = `Formulação ${params.especie_nome} - ${params.raca_nome}`
+    const [nome, setNome] = useState(nomeSugerido)
 
-    // Cálculo feito pelo backend (rota de prévia), o mesmo usado ao salvar:
-    // a tela mostra exatamente o que vai ficar gravado na formulação e no PDF.
     const [calculo, setCalculo] = useState<CalculoFormulacao | null>(null)
     const [carregandoCalculo, setCarregandoCalculo] = useState(true)
     const [erroCalculo, setErroCalculo] = useState<string | null>(null)
@@ -147,7 +148,7 @@ export default function RacaoStep4() {
         try {
             const programaRes = await api.post('/racao/programas', {
                 contrato_id:        contratoId ?? null,
-                nome:               `Formulação ${params.especie_nome} - ${params.raca_nome}`,
+                nome:               nome.trim() || nomeSugerido,
                 especie_id:         params.especie_id,
                 raca_id:            params.raca_id,
                 categoria_id:       params.categoria_id,
@@ -224,6 +225,22 @@ export default function RacaoStep4() {
                 <View style={styles.header}>
                     <Text style={globalStyles.pageTitle}>Resultado</Text>
                     <Text style={globalStyles.pageSubtitle}>Passo 4 de 4 — Balanço nutricional da formulação</Text>
+                </View>
+
+                <View style={[globalStyles.inputGroup, styles.secao]}>
+                    <Text style={globalStyles.inputLabel}>Nome da formulação</Text>
+                    <TextInput
+                        style={globalStyles.input}
+                        value={nome}
+                        onChangeText={setNome}
+                        placeholder={nomeSugerido}
+                        placeholderTextColor={Colors.gray[400]}
+                        maxLength={100}
+                        returnKeyType="done"
+                    />
+                    <Text style={globalStyles.inputHint}>
+                        Ajuda a encontrar esta formulação em "Minhas formulações"
+                    </Text>
                 </View>
 
                 {carregandoCalculo ? (

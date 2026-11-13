@@ -26,6 +26,7 @@ import { Icons } from '@/src/constants/icons'
 import { toastErro, toastInfo, toastSucesso } from '@/src/utils/toast'
 import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
+import ResumoConcentradoVolumoso from '@/src/components/Formulacao/ResumoConcentradoVolumoso'
 
 interface Ingrediente {
     id: string
@@ -396,6 +397,13 @@ export default function FormulacaoDetalheScreen() {
                             ))}
                         </View>
                     </View>
+                )}
+
+                {programa.ingredientes.length > 0 && (
+                    <ResumoConcentradoVolumoso
+                        itens={programa.ingredientes}
+                        quantidadeAnimais={programa.quantidade_animais}
+                    />
                 )}
 
                 {/* Balanço nutricional */}

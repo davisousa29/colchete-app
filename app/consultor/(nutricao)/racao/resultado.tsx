@@ -18,6 +18,7 @@ import { calcularFormulacao, CalculoFormulacao } from '@/src/services/racaoServi
 import { formatarNumero } from '@/src/utils/numbers'
 import { currencyMask } from '@/src/utils/masks/currencyMask'
 import { Icons } from '@/src/constants/icons'
+import ResumoConcentradoVolumoso from '@/src/components/Formulacao/ResumoConcentradoVolumoso'
 
 interface IngredienteParam {
     ingrediente_id: string
@@ -316,6 +317,8 @@ export default function RacaoStep4() {
                                 ))}
                             </View>
                         </View>
+
+                        <ResumoConcentradoVolumoso itens={calculo.itens} quantidadeAnimais={quantidade} />
 
                         {/* Balanço nutricional */}
                         <View style={styles.secao}>

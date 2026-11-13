@@ -36,6 +36,7 @@ interface Ingrediente {
     proporcao_pct: string
     consumo_ms_kg: string
     consumo_mn_kg: string
+    contrib_ndt_kg: string
     contrib_elm_mcal: string
     contrib_pb_g: string
     contrib_ca_g: string
@@ -67,7 +68,7 @@ interface Programa {
     quantidade_animais: number
     tipo_aplicacao: string
     exig_cms_kg: string
-    exig_ndt_kg: string
+    exig_ndt_kg: string | null
     exig_pb_g: string
     exig_elm_mcal: string
     exig_elg_mcal: string
@@ -276,6 +277,8 @@ export default function FormulacaoDetalheScreen() {
     const fornecidoPB  = programa.ingredientes.reduce((acc, ing) => acc + Number(ing.contrib_pb_g), 0)
     const fornecidoCa  = programa.ingredientes.reduce((acc, ing) => acc + Number(ing.contrib_ca_g), 0)
     const fornecidoP   = programa.ingredientes.reduce((acc, ing) => acc + Number(ing.contrib_p_g), 0)
+    const fornecidoNDT = programa.ingredientes.reduce((acc, ing) => acc + Number(ing.contrib_ndt_kg), 0)
+    const exigidoNDT   = Number(programa.exig_ndt_kg ?? 0)
 
     return (
         <View style={globalStyles.screen}>
@@ -357,6 +360,7 @@ export default function FormulacaoDetalheScreen() {
                     <View style={styles.card}>
                         {[
                             { label: 'CMS', valor: `${programa.exig_cms_kg} kg/dia` },
+                            ...(programa.exig_ndt_kg ? [{ label: 'NDT', valor: `${programa.exig_ndt_kg} kg/dia` }] : []),
                             { label: 'ELm', valor: `${programa.exig_elm_mcal} Mcal/dia` },
                             { label: 'ELg', valor: `${programa.exig_elg_mcal} Mcal/dia` },
                             { label: 'PB',  valor: `${programa.exig_pb_g} g/dia` },
@@ -412,6 +416,12 @@ export default function FormulacaoDetalheScreen() {
                         <Text style={styles.secaoTitulo}>Balanço nutricional</Text>
                         <Text style={styles.secaoSubtitulo}>Fornecido vs Exigido</Text>
                         <View style={styles.card}>
+                            {exigidoNDT > 0 && (
+                                <>
+                                    <BalancoItem label="Nutrientes Digestíveis Totais (NDT)" fornecido={fornecidoNDT} exigido={exigidoNDT} unidade="kg" />
+                                    <View style={styles.divisor} />
+                                </>
+                            )}
                             <BalancoItem label="Energia Líquida Mantença" fornecido={fornecidoELm} exigido={Number(programa.exig_elm_mcal)} unidade="Mcal" />
                             <View style={styles.divisor} />
                             <BalancoItem label="Proteína Bruta" fornecido={fornecidoPB} exigido={Number(programa.exig_pb_g)} unidade="g" />

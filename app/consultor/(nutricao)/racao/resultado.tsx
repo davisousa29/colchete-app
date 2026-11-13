@@ -325,6 +325,17 @@ export default function RacaoStep4() {
                             <Text style={styles.secaoTitulo}>Balanço nutricional</Text>
                             <Text style={styles.secaoSubtitulo}>Fornecido vs Exigido pelo animal</Text>
                             <View style={styles.card}>
+                                {exig.ndt > 0 && (
+                                    <>
+                                        <BalancoItem
+                                            label="Nutrientes Digestíveis Totais (NDT)"
+                                            fornecido={calculo.totais.contrib_ndt_kg}
+                                            exigido={exig.ndt}
+                                            unidade="kg"
+                                        />
+                                        <View style={styles.divisor} />
+                                    </>
+                                )}
                                 <BalancoItem
                                     label="Energia Líquida Mantença"
                                     fornecido={calculo.totais.contrib_elm_mcal}

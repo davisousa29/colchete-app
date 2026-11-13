@@ -10,6 +10,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Keyboard,
+    ScrollView,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Check } from 'lucide-react-native'
@@ -164,12 +165,35 @@ export default function RacaoStep3() {
         } as any)
     }
 
-    function rolarAteItem(id: string) {
+    function rolarAteItem(id: string, posicao: 0 | 1 = 1) {
         const index = ingredientesFiltrados.findIndex(i => i.id === id)
         if (index < 0) return
 
-        listaRef.current?.scrollToIndex({ index, viewPosition: 1, animated: true })
+        listaRef.current?.scrollToIndex({ index, viewPosition: posicao, animated: true })
     }
+
+    const rolarDepoisDeFiltrar = useRef<string | null>(null)
+
+    function irParaIngrediente(id: string) {
+        const visivel = ingredientesFiltrados.some(i => i.id === id)
+
+        if (visivel) {
+            rolarAteItem(id, 0)
+            return
+        }
+
+        rolarDepoisDeFiltrar.current = id
+        setBusca('')
+        setFiltroTipo('todos')
+    }
+
+    useEffect(() => {
+        const id = rolarDepoisDeFiltrar.current
+        if (!id) return
+
+        rolarDepoisDeFiltrar.current = null
+        setTimeout(() => rolarAteItem(id, 0), 100)
+    }, [ingredientesFiltrados])
 
     useEffect(() => {
         const sub = Keyboard.addListener('keyboardDidShow', () => {
@@ -327,6 +351,35 @@ export default function RacaoStep3() {
                                     </View>
                                 )}
 
+                                {selecionados.length > 0 && (
+                                    <View style={styles.selecionadosBloco}>
+                                        <Text style={styles.selecionadosTitulo}>Selecionados</Text>
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            contentContainerStyle={styles.selecionadosLista}
+                                            keyboardShouldPersistTaps="handled"
+                                        >
+                                            {selecionados.map(s => {
+                                                const pct = parsearNumero(s.proporcao_pct)
+                                                const pendente = pct <= 0
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={s.ingrediente.id}
+                                                        style={[styles.chipSelecionado, pendente && styles.chipPendente]}
+                                                        onPress={() => irParaIngrediente(s.ingrediente.id)}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <Text style={styles.chipSelecionadoTexto} numberOfLines={1}>
+                                                            {s.ingrediente.nome} · {pendente ? '—' : `${s.proporcao_pct}%`}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )
+                                            })}
+                                        </ScrollView>
+                                    </View>
+                                )}
+
                                 <View style={styles.filtros}>
                                     <SearchBar value={busca} onChange={setBusca} placeholder="Buscar ingrediente..." />
                                     <FilterChips chips={TIPO_CHIPS} selecionado={filtroTipo} onChange={setFiltroTipo} />
@@ -344,7 +397,7 @@ export default function RacaoStep3() {
                             activeOpacity={0.8}
                         >
                             <Text style={globalStyles.buttonPrimaryText}>
-                                Próximo → Ver resultado ({selecionados.length} ingrediente{selecionados.length !== 1 ? 's' : ''})
+                                Ver resultado ({selecionados.length} ingrediente{selecionados.length !== 1 ? 's' : ''})
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -448,5 +501,35 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white,
         borderTopWidth: 1,
         borderTopColor: Colors.gray[200],
+    },
+    selecionadosBloco: {
+        marginBottom: Spacing.sm,
+    },
+    selecionadosTitulo: {
+        fontSize: FontSize.xs,
+        fontWeight: '600',
+        color: Colors.gray[600],
+        marginBottom: Spacing.xs,
+    },
+    selecionadosLista: {
+        gap: Spacing.xs,
+    },
+    chipSelecionado: {
+        maxWidth: 220,
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 6,
+        borderRadius: BorderRadius.full,
+        borderWidth: 1.5,
+        borderColor: Colors.primary,
+        backgroundColor: Colors.primary + '15',
+    },
+    chipPendente: {
+        borderColor: Colors.warning,
+        backgroundColor: Colors.warning + '20',
+    },
+    chipSelecionadoTexto: {
+        fontSize: FontSize.xs,
+        fontWeight: '600',
+        color: Colors.black,
     },
 })

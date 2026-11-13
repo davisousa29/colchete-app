@@ -205,7 +205,7 @@ export default function RacaoStep2() {
                             onPress={handleProximo}
                             activeOpacity={0.8}
                         >
-                            <Text style={globalStyles.buttonPrimaryText}>Próximo → Selecionar ingredientes</Text>
+                            <Text style={globalStyles.buttonPrimaryText}>Próximo →</Text>
                         </TouchableOpacity>
                     </>
                 )}
